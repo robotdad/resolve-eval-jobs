@@ -121,6 +121,68 @@ Cross-process ID uniqueness is not guaranteed and is outside scope.
 
 The service binds only to `127.0.0.1` (loopback). It has no external service dependencies, no subprocess execution, and no arbitrary job-command interface. Word counting is the sole job type.
 
+## Administrative CLI
+
+The `jobs-admin` command is a read-only administrative client that lists jobs from the running service.
+
+### Building the CLI
+
+```sh
+go build -o jobs-admin ./cmd/jobs-admin
+```
+
+### Running the CLI
+
+```sh
+./jobs-admin [--endpoint URL] [--json]
+```
+
+**Flags:**
+
+- `--endpoint URL` — service base URL (default: `http://127.0.0.1:8080`)
+- `--json` — emit a JSON array to stdout instead of human-readable text
+
+### Default (human-readable) output
+
+```
+ID      STATUS      WORD COUNT
+------  ----------  ----------
+1       succeeded   2
+2       succeeded   3
+```
+
+When no jobs exist:
+
+```
+No jobs found.
+```
+
+### JSON output
+
+With `--json`, the command emits exactly one valid JSON array to stdout whose content and element order match `GET /jobs`. An empty inventory emits `[]`.
+
+```sh
+./jobs-admin --json
+# [{"id":"1","status":"succeeded","text":"hello world","result":{"word_count":2}}]
+```
+
+### Endpoint selection
+
+By default the CLI connects to the service at `http://127.0.0.1:8080`. Use `--endpoint` to target a different address:
+
+```sh
+./jobs-admin --endpoint http://127.0.0.1:9090
+```
+
+### Error behavior
+
+- Invalid or non-absolute endpoint URL → exit 1, useful message on stderr
+- Unreachable service → exit 1, useful message on stderr
+- HTTP error response → exit 1, useful message on stderr
+- With `--json`, stdout is always empty on failure; diagnostics go to stderr only
+
+The CLI is read-only: it never creates or mutates jobs.
+
 ## Running tests
 
 ```sh
@@ -139,3 +201,4 @@ Tests cover:
 - Restart boundary (fresh server = empty state)
 - Loopback-only and no-subprocess source review tests
 - Concurrent submission stress test
+- CLI acceptance tests (build, populated/empty inventory text and JSON, error scenarios, read-only behavior)
