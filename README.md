@@ -64,6 +64,50 @@ List all jobs in submission order.
 ]
 ```
 
+### GET /jobs?limit=N (paginated)
+
+Paginate jobs ordered by text ascending (Go bytewise lexicographic), then by numeric ID ascending. Returns a JSON object envelope instead of a bare array.
+
+**Query parameters:**
+
+- `limit` (positive integer, 1–100, required): maximum number of jobs per page.
+- `cursor` (opaque string, optional): continuation token from a previous response's `next_cursor`. Requires `limit`.
+
+**Response** (HTTP 200 OK):
+
+```json
+{
+  "jobs": [
+    {"id": "4", "status": "succeeded", "text": "", "result": {"word_count": 0}},
+    {"id": "5", "status": "succeeded", "text": "A", "result": {"word_count": 1}}
+  ],
+  "next_cursor": "<opaque string or null>"
+}
+```
+
+- `next_cursor` is `null` when there are no further pages.
+- When `next_cursor` is non-null, pass it as `cursor` in the next request to continue.
+
+**Error responses:**
+
+- `400 Bad Request` — `limit` is missing, non-positive, non-integer, or exceeds 100; or `cursor` is supplied without `limit`; or `cursor` is malformed.
+
+**Ordering:**
+
+Jobs are sorted by text ascending (Go bytewise / UTF-8 lexicographic), breaking ties by numeric job ID ascending. Identical text values are always returned in ID order.
+
+**Example traversal:**
+
+```sh
+# Page 1
+curl "http://127.0.0.1:8080/jobs?limit=3"
+# {"jobs":[...],"next_cursor":"<token>"}
+
+# Page 2
+curl "http://127.0.0.1:8080/jobs?limit=3&cursor=<token>"
+# {"jobs":[...],"next_cursor":null}
+```
+
 ### GET /jobs/{id}
 
 Retrieve a single job by ID.
@@ -103,7 +147,8 @@ Examples:
 
 ## Ordering and identity
 
-- Jobs are returned by `GET /jobs` in submission order.
+- Jobs are returned by `GET /jobs` (no `limit`) in submission order.
+- Jobs are returned by `GET /jobs?limit=N` in text-ascending, ID-ascending order (see paginated endpoint above).
 - Job IDs are distinct, sequential integers, scoped to the process lifetime.
 - Submitting identical text creates distinct jobs with distinct IDs.
 
@@ -202,3 +247,4 @@ Tests cover:
 - Loopback-only and no-subprocess source review tests
 - Concurrent submission stress test
 - CLI acceptance tests (build, populated/empty inventory text and JSON, error scenarios, read-only behavior)
+- Pagination acceptance tests (oracle sequence with limit=1/3/10, tie-boundary cursor correctness, envelope shape, invalid parameter rejection, read-only invariant, race-detector clean)
